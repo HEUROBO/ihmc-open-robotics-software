@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 
 import us.ihmc.commonWalkingControlModules.bipedSupportPolygons.BipedSupportPolygons;
 import us.ihmc.commonWalkingControlModules.capturePoint.CoPPointPlanningParameters;
+import us.ihmc.commonWalkingControlModules.capturePoint.smoothCMPBasedICPPlanner.SmoothCMPBasedICPPlanner;
 import us.ihmc.commonWalkingControlModules.capturePoint.smoothCMPBasedICPPlanner.WalkingTrajectoryType;
 import us.ihmc.commonWalkingControlModules.configurations.CoPPlannerParameters;
 import us.ihmc.commonWalkingControlModules.configurations.CoPPointName;
@@ -1043,10 +1044,12 @@ public class ReferenceCoPTrajectoryGenerator implements ReferenceCoPTrajectoryGe
    private double getSwingSegmentTimes(int segmentIndex, int footstepIndex)
    {
       double swingTime = swingDurations.get(footstepIndex).getDoubleValue();
-      if (swingTime <= 0.0 || !Double.isFinite(swingTime))
+      if (swingTime <= 0.0 || Double.isNaN(swingTime))
       {
          swingTime = defaultSwingTime;
       }
+      if (Double.isInfinite(swingTime))
+         swingTime = SmoothCMPBasedICPPlanner.SUFFICIENTLY_LARGE;
 
       double initialSegmentDuration =
             swingTime * swingDurationShiftFractions.get(footstepIndex).getDoubleValue() * swingSplitFractions.get(footstepIndex).getDoubleValue();
@@ -1142,7 +1145,7 @@ public class ReferenceCoPTrajectoryGenerator implements ReferenceCoPTrajectoryGe
             copPlannerParameters = copPointParametersMap.get(CoPPointName.TOE_COP);
          else
             copPlannerParameters = copPointParametersMap.get(exitCoPName);
-         
+
          framePointToPack.setIncludingFrame(supportFootPolygon.getCentroid(), 0.0);
          framePointToPack.add(supportFootPolygon.getMaxX() - exitCoPForwardSafetyMarginOnToes.getDoubleValue(),
                               copPlannerParameters.getCoPOffsets(supportSide).getY(), 0.0);
