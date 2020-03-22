@@ -184,6 +184,7 @@ public class SmoothCMPBasedICPPlanner implements ICPPlannerInterface
    protected final List<YoDouble> transferDurations = new ArrayList<>();
    protected final YoDouble defaultFinalTransferDuration = new YoDouble(namePrefix + "DefaultFinalTransferDuration", registry);
    protected final YoDouble finalTransferDuration = new YoDouble(namePrefix + "FinalTransferDuration", registry);
+   private final YoBoolean shouldClampDuration = new YoBoolean(namePrefix + "ShouldClampDuration", registry);
 
    /** Desired velocity for the Center of Mass (CoM) */
    final YoFrameVector3D desiredCoMVelocity = new YoFrameVector3D(namePrefix + "DesiredCoMVelocity", worldFrame, registry);
@@ -882,6 +883,7 @@ public class SmoothCMPBasedICPPlanner implements ICPPlannerInterface
       transferDurationAlphas.get(0).set(finalTransferDurationAlpha.getDoubleValue());
       referenceICPGenerator.setInitialConditionsForAdjustment();
       referenceCoMGenerator.initializeForSwingOrTransfer();
+      shouldClampDuration.set(false);
 
       // If continuous update is enabled the plan will be updated in the compute method. If not, we update the plan here.
       if (!doContinuousReplanningForStanding.getValue())
@@ -897,6 +899,7 @@ public class SmoothCMPBasedICPPlanner implements ICPPlannerInterface
       this.initialTime.set(initialTime);
       isDoubleSupport.set(true);
       isInitialTransfer.set(isStanding.getBooleanValue());
+      shouldClampDuration.set(true);
 
       if (isInitialTransfer.getBooleanValue() || isFinalTransfer.getValue())
          previousTransferToSide.set(null);
@@ -935,6 +938,7 @@ public class SmoothCMPBasedICPPlanner implements ICPPlannerInterface
       isInitialTransfer.set(false);
       isFinalTransfer.set(false);
       isHoldingPosition.set(false);
+      shouldClampDuration.set(false);
 
       int numberOfFootstepRegistered = getNumberOfFootstepsRegistered();
       transferDurations.get(numberOfFootstepRegistered).set(finalTransferDuration.getDoubleValue());
@@ -1122,7 +1126,8 @@ public class SmoothCMPBasedICPPlanner implements ICPPlannerInterface
          timeInCurrentState.set(time - initialTime.getDoubleValue());
          timeInCurrentStateRemaining.set(getCurrentStateDuration() - timeInCurrentState.getDoubleValue());
 
-         clampedTimeInCurrentState.set(MathTools.clamp(this.timeInCurrentState.getDoubleValue(), 0.0, SUFFICIENTLY_LARGE));
+         double maxValue = shouldClampDuration.getValue() ? referenceCoPGenerator.getCurrentStateFinalTime() : SUFFICIENTLY_LARGE;
+         clampedTimeInCurrentState.set(MathTools.clamp(this.timeInCurrentState.getDoubleValue(), 0.0, maxValue));
 
          referenceICPGenerator.compute(clampedTimeInCurrentState.getDoubleValue());
          referenceCoMGenerator.compute(clampedTimeInCurrentState.getDoubleValue());
