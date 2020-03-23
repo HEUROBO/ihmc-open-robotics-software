@@ -883,7 +883,7 @@ public class SmoothCMPBasedICPPlanner implements ICPPlannerInterface
       transferDurationAlphas.get(0).set(finalTransferDurationAlpha.getDoubleValue());
       referenceICPGenerator.setInitialConditionsForAdjustment();
       referenceCoMGenerator.initializeForSwingOrTransfer();
-      shouldClampDuration.set(false);
+      shouldClampDuration.set(true);
 
       // If continuous update is enabled the plan will be updated in the compute method. If not, we update the plan here.
       if (!doContinuousReplanningForStanding.getValue())
