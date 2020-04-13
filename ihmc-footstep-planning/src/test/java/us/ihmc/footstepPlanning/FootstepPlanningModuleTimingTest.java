@@ -50,7 +50,7 @@ public class FootstepPlanningModuleTimingTest
    //
    // Date                 Time per iteration      Note
    // 20200409_141222		0.022284476169492553    Before reducing branch factor
-   //
+   // 20200413_165350		0.001934497656758641    With reduced branch factor of 50
    //
    //
 
