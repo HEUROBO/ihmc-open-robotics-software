@@ -12,12 +12,13 @@ import us.ihmc.footstepPlanning.graphSearch.parameters.FootstepPlannerParameters
 import us.ihmc.robotics.robotSide.RobotSide;
 
 import java.util.*;
+import java.util.function.UnaryOperator;
 
 public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
 {
    private final List<FootstepNode> fullExpansion = new ArrayList<>();
    private final FootstepPlannerParametersReadOnly parameters;
-   private final IdealStepCalculator idealStepCalculator;
+   private final UnaryOperator<FootstepNode> idealStepSupplier;
    private final IdealStepProximityComparator idealStepProximityComparator = new IdealStepProximityComparator();
    private final HashMap<FootstepNode, PartialExpansionManager> expansionManagers = new HashMap<>();
 
@@ -27,10 +28,10 @@ public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
 
    private boolean partialExpansionEnabled;
 
-   public ParameterBasedNodeExpansion(FootstepPlannerParametersReadOnly parameters, IdealStepCalculator idealStepCalculator)
+   public ParameterBasedNodeExpansion(FootstepPlannerParametersReadOnly parameters, UnaryOperator<FootstepNode> idealStepSupplier)
    {
       this.parameters = parameters;
-      this.idealStepCalculator = idealStepCalculator;
+      this.idealStepSupplier = idealStepSupplier;
    }
 
    public void initialize()
@@ -112,40 +113,37 @@ public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
             fullExpansionToPack.add(childNode);
       }
 
-      if (idealStepCalculator != null)
+      if (idealStepSupplier != null)
       {
-         idealStepProximityComparator.update(stanceNode);
+         idealStepProximityComparator.update(stanceNode, idealStepSupplier);
          fullExpansionToPack.sort(idealStepProximityComparator);
       }
    }
 
-   private class IdealStepProximityComparator implements Comparator<FootstepNode>
+   static class IdealStepProximityComparator implements Comparator<FootstepNode>
    {
       private FootstepNode idealStep = null;
 
-      void update(FootstepNode stanceNode)
+      void update(FootstepNode stanceNode, UnaryOperator<FootstepNode> idealStepSupplier)
       {
-         idealStep = idealStepCalculator.computeIdealStep(stanceNode);
+         idealStep = idealStepSupplier.apply(stanceNode);
       }
 
       @Override
       public int compare(FootstepNode node1, FootstepNode node2)
       {
          Objects.requireNonNull(idealStep);
-
-         int dX1 = node1.getXIndex() - idealStep.getXIndex();
-         int dX2 = node2.getXIndex() - idealStep.getXIndex();
-
-         int dY1 = node1.getYIndex() - idealStep.getYIndex();
-         int dY2 = node2.getYIndex() - idealStep.getYIndex();
-
-         int dYaw1 = node1.yawIndexDistance(idealStep);
-         int dYaw2 = node2.yawIndexDistance(idealStep);
-
-         double d1 = dX1 * dX1 + dY1 * dY1 + dYaw1 * dYaw1;
-         double d2 = dX2 * dX2 + dY2 * dY2 + dYaw2 * dYaw2;
-
+         double d1 = calculateStepProximity(node1, idealStep);
+         double d2 = calculateStepProximity(node2, idealStep);
          return Double.compare(d1, d2);
+      }
+
+      static double calculateStepProximity(FootstepNode node1, FootstepNode node2)
+      {
+         int dX = node1.getXIndex() - node2.getXIndex();
+         int dY = node1.getYIndex() - node2.getYIndex();
+         int dYaw = node1.yawIndexDistance(node2);
+         return dX * dX + dY * dY + dYaw * dYaw;
       }
    }
 
