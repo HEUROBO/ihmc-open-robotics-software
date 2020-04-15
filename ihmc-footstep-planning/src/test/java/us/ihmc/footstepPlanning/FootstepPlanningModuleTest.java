@@ -1,5 +1,6 @@
 package us.ihmc.footstepPlanning;
 
+import org.apache.commons.lang3.mutable.MutableDouble;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -109,6 +110,7 @@ public class FootstepPlanningModuleTest
    public void testGoalProximityWhenGoalIsReachable()
    {
       FootstepPlanningModule planningModule = new FootstepPlanningModule(getClass().getSimpleName());
+      planningModule.getFootstepPlannerParameters().setMaximumBranchFactor(0);
 
       PlanarRegionsListGenerator planarRegionsListGenerator = new PlanarRegionsListGenerator();
       planarRegionsListGenerator.addRectangle(6.0, 6.0);
@@ -265,27 +267,35 @@ public class FootstepPlanningModuleTest
       DataSet dataSet = DataSetIOTools.loadDataSet(DataSetName._20190219_182005_Random);
       PlannerInput plannerInput = dataSet.getPlannerInput();
 
+      // unreachable goal to make sure planner doesn't find plan
+      Pose3D goalPose = new Pose3D(8.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+
       FootstepPlannerRequest request = new FootstepPlannerRequest();
       request.setTimeout(Double.MAX_VALUE);
       Pose3D initialMidFootPose = new Pose3D(plannerInput.getStartPosition(), new Quaternion(plannerInput.getStartYaw(), 0.0, 0.0));
-      Pose3D goalMidFootPose = new Pose3D(plannerInput.getGoalPosition(), new Quaternion(plannerInput.getGoalYaw(), 0.0, 0.0));
       request.setStartFootPoses(planningModule.getFootstepPlannerParameters().getIdealFootstepWidth(), initialMidFootPose);
-      request.setGoalFootPoses(planningModule.getFootstepPlannerParameters().getIdealFootstepWidth(), goalMidFootPose);
+      request.setGoalFootPoses(planningModule.getFootstepPlannerParameters().getIdealFootstepWidth(), goalPose);
       request.setRequestedInitialStanceSide(RobotSide.LEFT);
       request.setPlanarRegionsList(dataSet.getPlanarRegionsList());
       request.setPlanBodyPath(false);
       request.setAbortIfBodyPathPlannerFails(false);
-
-      Stopwatch stopwatch = new Stopwatch();
+      request.setSnapGoalSteps(false);
 
       // test time
       double customTimeout = 1.65;
-      planningModule.addCustomTerminationCondition((time, iterations, finalStep, pathSize) -> time >= customTimeout);
-      stopwatch.start();
+      MutableDouble previousIterationTime = new MutableDouble();
+      MutableDouble finalIterationTime = new MutableDouble();
+
+      planningModule.addCustomTerminationCondition((time, iterations, finalStep, pathSize) ->
+                                                   {
+                                                      previousIterationTime.setValue(finalIterationTime);
+                                                      finalIterationTime.setValue(time);
+                                                      return time >= customTimeout;
+                                                   });
       FootstepPlannerOutput output = planningModule.handleRequest(request);
-      double planTime = stopwatch.totalElapsed();
       Assertions.assertEquals(output.getFootstepPlanningResult(), FootstepPlanningResult.HALTED);
-      Assertions.assertTrue(MathTools.epsilonEquals(customTimeout, planTime, 0.075));
+      Assertions.assertTrue(previousIterationTime.getValue() < customTimeout);
+      Assertions.assertTrue(finalIterationTime.getValue() >= customTimeout);
 
       // test iteration limit
       int iterationLimit = 29;
