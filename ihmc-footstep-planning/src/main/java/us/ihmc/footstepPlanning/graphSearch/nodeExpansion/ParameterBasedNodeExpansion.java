@@ -1,6 +1,7 @@
 package us.ihmc.footstepPlanning.graphSearch.nodeExpansion;
 
 import gnu.trove.list.array.TDoubleArrayList;
+import gnu.trove.list.array.TIntArrayList;
 import us.ihmc.commons.InterpolationTools;
 import us.ihmc.commons.MathTools;
 import us.ihmc.euclid.axisAngle.AxisAngle;
@@ -28,10 +29,26 @@ public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
 
    private boolean partialExpansionEnabled;
 
+   // List of accepted values for manhattan between ideal step and child step
+   private final TIntArrayList expansionMask = new TIntArrayList();
+
    public ParameterBasedNodeExpansion(FootstepPlannerParametersReadOnly parameters, UnaryOperator<FootstepNode> idealStepSupplier)
    {
       this.parameters = parameters;
       this.idealStepSupplier = idealStepSupplier;
+      fillExpansionMask();
+   }
+
+   private void fillExpansionMask()
+   {
+      expansionMask.add(0);
+      expansionMask.add(1);
+      expansionMask.add(3);
+      expansionMask.add(5);
+      expansionMask.add(8);
+      expansionMask.add(12);
+      expansionMask.add(16);
+      expansionMask.add(20);
    }
 
    public void initialize()
@@ -109,7 +126,7 @@ public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
          double stepYaw = stepSide.negateIfRightSide(yawOffsets.get(i));
          FootstepNode childNode = constructNodeInPreviousNodeFrame(stepLength, stepWidth, stepYaw, stanceNode);
 
-         if (!fullExpansionToPack.contains(childNode))
+         if (!fullExpansionToPack.contains(childNode) && applyMask(stanceNode, childNode))
             fullExpansionToPack.add(childNode);
       }
 
@@ -118,6 +135,17 @@ public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
          idealStepProximityComparator.update(stanceNode, idealStepSupplier);
          fullExpansionToPack.sort(idealStepProximityComparator);
       }
+   }
+
+   private boolean applyMask(FootstepNode stanceNode, FootstepNode childNode)
+   {
+      if (!parameters.getEnabledExpansionMask())
+      {
+         return true;
+      }
+
+      int distance = idealStepSupplier.apply(stanceNode).computeManhattanDistance(childNode);
+      return expansionMask.contains(distance);
    }
 
    static class IdealStepProximityComparator implements Comparator<FootstepNode>
@@ -142,7 +170,7 @@ public class ParameterBasedNodeExpansion implements FootstepNodeExpansion
       {
          int dX = node1.getXIndex() - node2.getXIndex();
          int dY = node1.getYIndex() - node2.getYIndex();
-         int dYaw = node1.yawIndexDistance(node2);
+         int dYaw = node1.computeYawIndexDistance(node2);
          return dX * dX + dY * dY + dYaw * dYaw;
       }
    }
